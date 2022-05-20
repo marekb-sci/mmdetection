@@ -1,3 +1,7 @@
+## Fork changes with respect to the origin MMDetection repo
+- tools/train.py script accepts multiple configs (cascade of configs), e.g. `train.py base_model_config.py data_config.py run_config.py ...` what means that different pices of training pipeline can be easely combined and reused for different runs
+- Dockerfile contains Tensorboard installation
+
 <div align="center">
   <img src="resources/mmdet-logo.png" width="600"/>
   <div>&nbsp;</div>
