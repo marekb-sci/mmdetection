@@ -24,7 +24,10 @@ from mmdet.utils import (collect_env, get_device, get_root_logger,
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
-    parser.add_argument('config', help='train config file path')
+    parser.add_argument('configs',
+        nargs='+',
+        help='file paths of configs used to train. If more than one, later files override config entries of earliers.'
+        )
     parser.add_argument('--work-dir', help='the dir to save logs and models')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
@@ -108,7 +111,13 @@ def parse_args():
 def main():
     args = parse_args()
 
-    cfg = Config.fromfile(args.config)
+    cfg = None
+    for config_path in args.configs:
+        next_cfg = Config.fromfile(config_path)
+        if cfg is None:
+            cfg = next_cfg
+        else:
+            cfg.merge_from_dict(next_cfg._cfg_dict)
 
     # replace the ${key} with the value of cfg.key
     cfg = replace_cfg_vals(cfg)
@@ -118,6 +127,9 @@ def main():
 
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
+
+
+    cfg.run_label = osp.splitext(osp.basename(args.configs[0]))[0]
 
     if args.auto_scale_lr:
         if 'auto_scale_lr' in cfg and \
@@ -144,9 +156,7 @@ def main():
         cfg.work_dir = args.work_dir
     elif cfg.get('work_dir', None) is None:
         # use config filename as default work_dir if cfg.work_dir is None
-        cfg.work_dir = osp.join('./work_dirs',
-                                osp.splitext(osp.basename(args.config))[0])
-
+        cfg.work_dir = osp.join('./work_dirs', cfg.run_label)
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
     cfg.auto_resume = args.auto_resume
@@ -177,7 +187,7 @@ def main():
     # create work_dir
     mmcv.mkdir_or_exist(osp.abspath(cfg.work_dir))
     # dump config
-    cfg.dump(osp.join(cfg.work_dir, osp.basename(args.config)))
+    cfg.dump(osp.join(cfg.work_dir, cfg.run_label + '.py'))
     # init the logger before other steps
     timestamp = time.strftime('%Y%m%d_%H%M%S', time.localtime())
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
@@ -207,7 +217,7 @@ def main():
     set_random_seed(seed, deterministic=args.deterministic)
     cfg.seed = seed
     meta['seed'] = seed
-    meta['exp_name'] = osp.basename(args.config)
+    meta['exp_name'] = cfg.run_label
 
     model = build_detector(
         cfg.model,
